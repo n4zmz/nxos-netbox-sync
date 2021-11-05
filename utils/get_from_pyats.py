@@ -3,37 +3,53 @@ from genie.testbed import load
 from genie.libs.conf.vlan import Vlan
 from genie.libs.conf.interface import Interface
 
-device_details = {"devices": {
-    os.getenv("SWITCH_HOSTNAME"): {
-        "protocol": "ssh", 
-        "ip": os.getenv("SWITCH_MGMT_IP"), 
-        "port": os.getenv("SWITCH_MGMT_PORT", default=22), 
-        "username": os.getenv("SWITCH_USERNAME"),
-        "password": os.getenv("SWITCH_PASSWORD"),
-        "os":"nxos",
-        "ssh_options": "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null",
-    }
-}
-}
-testbed = load(device_details)
-device = testbed.devices[os.getenv("SWITCH_HOSTNAME")]
-# device.connect(learn_hostname=True)
+keys_to_migrate = ("access_vlan", "switchport_enable",
+                  "switchport_mode", "trunk_vlans")
+
+testbed = load("testbed.yml")
+host = os.getenv("SWITCH_HOSTNAME")
+device = testbed.devices[host]
 device.connect(learn_hostname=True, log_stdout=False, ssh_options='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null')
+if device.os == "iosxe":
+    output = testbed.devices[host].parse('show interfaces switchport')
 
 def platform_info(): 
     return device.learn("platform")
 
 def interfaces_current(): 
     interfaces = device.learn("interface")
-
+    if device.os != "iosxe":
+        return interfaces.info
+    for interface_key in interfaces.info:
+        if interface_key not in output.keys():
+            continue
+        interface = interfaces.info[interface_key]
+        for key in keys_to_migrate:
+            if key in output[interface_key].keys():
+                interface[key] = output[interface_key][key]
+        interfaces.info[interface_key] = interface
     return interfaces.info
 
 
 def vlans_current():
     vlans = device.learn("vlan").info["vlans"]
     # device_vlan_set = set([(int(vid), details["name"]) for vid, details in vlans.items()])
-    return vlans
+    if device.os != "iosxe":
+        return vlans
 
+    # need to update to support iosxe where show vlan does not add trunks
+    for interface in output:
+        if "operational_mode" not in output[interface].keys():
+            continue
+        if output[interface]["operational_mode"] == "trunk":
+            if output[interface]["trunk_vlans"] == "all":
+                for vlan in vlans:
+                    if vlans[vlan]["state"] != "active":
+                        continue
+                    if "interfaces" not in vlans[vlan].keys():
+                        vlans[vlan]["interfaces"] = list()
+                    vlans[vlan]["interfaces"].append(interface)
+    return vlans
 
 def vlans_configure(netbox_vlans): 
     results = []

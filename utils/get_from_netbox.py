@@ -1,5 +1,8 @@
 import pynetbox
 import os
+import urllib3
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 # import ipaddress
 
 netbox_token = os.getenv("NETBOX_TOKEN")
@@ -10,6 +13,7 @@ switch_name = os.getenv("SWITCH_HOSTNAME")
 # tenant_name = os.getenv("NETBOX_TENANT")
 
 netbox = pynetbox.api(netbox_url, token=netbox_token)
+netbox.http_session.verify = False
 device = netbox.dcim.devices.get(name=switch_name)
 
 
@@ -27,9 +31,9 @@ def interfaces_sot():
     #             ip_address.address, strict=False
     #         )
 
-    return interfaces
+    return list(interfaces)
 
 
 def vlans_sot(): 
     vlans = netbox.ipam.vlans.filter(site_id=device.site.id)
-    return vlans 
+    return list(vlans)

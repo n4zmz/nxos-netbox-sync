@@ -10,10 +10,10 @@ def verify_vlans_exist(netbox_vlans, pyats_vlans):
         if str(vlan.vid) in pyats_vlans.keys(): 
             # print(f"✅ {vlan.vid} exists on switch")
             if vlan.name == pyats_vlans[str(vlan.vid)]["name"]: 
-                print(f"✅ {vlan.display_name} exists with correct name on switch")
+                print(f"✅ {vlan.display} exists with correct name on switch")
                 results["PASS"].append(vlan)
             else: 
-                print(f"❌ {vlan.display_name} exists but with WRONG name on switch")
+                print(f"❌ {vlan.display} exists but with WRONG name on switch")
                 results["FAIL"].append(vlan)
         else: 
             print(f"❌ {vlan.vid} MISSING from switch")
@@ -29,7 +29,7 @@ def verify_interface_enabled(netbox_interfaces, pyats_interfaces):
         "VERIFY_DISABLED": []
     }
 
-    for interface in netbox_interfaces: 
+    for interface in netbox_interfaces:
         if interface.enabled: 
             interface_status = "Enabled"
         else: 
@@ -84,7 +84,7 @@ def verify_interface_descriptions(netbox_interfaces, pyats_interfaces):
         "FAIL": [],
     }
 
-    for interface in netbox_interfaces: 
+    for interface in netbox_interfaces:
         if interface.name in pyats_interfaces.keys(): 
             # If there is a description configured in Netbox 
             if len(interface.description) > 0: 
@@ -164,7 +164,6 @@ def verify_interface_vlans(netbox_interfaces, pyats_interfaces, pyats_vlans):
     }
 
     for interface in netbox_interfaces: 
-        # print(f"processing interface {interface.name}")
         if interface.name in pyats_interfaces.keys(): 
             # Checking Layer 2 Interfaces: ie interface.mode != None
             if interface.mode: 
@@ -181,8 +180,8 @@ def verify_interface_vlans(netbox_interfaces, pyats_interfaces, pyats_vlans):
                             # else: 
                             #     print(f"❌ {interface.name} incorrectly has {pyats_interfaces[interface.name]['native_vlan']} configured as the native vlan id. It should be {interface.untagged_vlan.vid}")
                             #     results["FAIL"].add(interface)
-                        else: 
-                            if interface.untagged_vlan.vid == pyats_interfaces[interface.name]["access_vlan"]: 
+                        else:
+                            if str(interface.untagged_vlan.vid) == str(pyats_interfaces[interface.name]["access_vlan"]):
                                 print(f"✅ {interface.name} correctly has {interface.untagged_vlan.vid} configured as the access vlan id")
                                 results["PASS"].add(interface)
                             else: 
@@ -208,7 +207,7 @@ def verify_interface_vlans(netbox_interfaces, pyats_interfaces, pyats_vlans):
                                 results["FAIL"].add(interface)
                     # For Tagged All, verify trunk and ALL Vlans are trunked 
                     if interface.mode.label == "Tagged All": 
-                        if pyats_interfaces[interface.name]["trunk_vlans"] == "1-4094": 
+                        if pyats_interfaces[interface.name]["trunk_vlans"] in {"1-4094", "all"}:
                             print(f"✅ {interface.name} correctly is trunking ALL vlan ids.")
                             results["PASS"].add(interface)
                         else: 
@@ -220,7 +219,7 @@ def verify_interface_vlans(netbox_interfaces, pyats_interfaces, pyats_vlans):
                     results["FAIL"].add(interface)
         else: 
             print(f"❌ {interface.name} MISSING from switch")
-            results["FAIL"].append(interface)
+            results["FAIL"].add(interface)
 
     # Convert results to lists from sets
     results = {
